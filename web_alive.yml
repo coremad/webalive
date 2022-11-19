@@ -1,0 +1,11 @@
+---
+secrets:
+  - b0d9e8bf310ef55a7f39e00f0ae97a031c2e8c5d
+
+dbconn:
+  dbname: 'test'
+  host: 'localhost'
+  port: 5432
+  username: 'admin'
+  password: 'admin'
+

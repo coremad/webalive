@@ -1,0 +1,41 @@
+#here_table {
+  border-style: groove;
+}
+
+.thead {
+  background-color: antiquewhite;
+}
+
+.tline0 {
+  background-color: aliceblue;
+}
+
+.hname {
+  font-weight: bold;
+}
+
+.del_url {
+  width: 16px;
+  cursor: pointer;
+}
+
+.ok {
+    color: green;
+}
+
+.wtf {
+    color: yellow;
+}
+
+.fok {
+    color: blue;
+}
+
+.sad {
+    color: red;
+}
+
+.bad {
+    color: magenta;
+}
+
