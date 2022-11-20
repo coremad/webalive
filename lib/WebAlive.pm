@@ -32,4 +32,5 @@ sub startup ($self) {
 sub myconfig {
   return($config);
 }
+
 1;

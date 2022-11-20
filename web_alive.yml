@@ -4,13 +4,15 @@ secrets:
 
 dbconn:
   dbname: 'test'
-  host: 'localhost'
+  host: 'pg_db'
   port: 5432
   username: 'admin'
   password: 'admin'
 
 max_workers: 5
 max_headers: 3
-pool_interval: 120
-pid_file: '/tmp/webpoold.pid'
-api_endpoint: 'http://127.0.0.1:3000/api'
+pool_interval: 60
+pid_file: './tmp/webpoold.pid'
+api_endpoint: 'http://web:3000/api'
+
+daemon_endpoint: daemon:3001

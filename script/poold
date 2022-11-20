@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 use strict;
 use warnings FATAL => 'all';
 
@@ -69,15 +69,17 @@ close $pf;
 do {
     my $ua  = Mojo::UserAgent->new;
     my $next_time = $config->{pool_interval} + time();
-    say ">>\t" . localtime;
-    $url_list = decode_json($ua->get("$config->{api_endpoint}/url_list")->{res}->{content}->{asset}->{content});
+    say STDERR ">>\t" . localtime;
+    my $content;
+    sleep(1) until $content = $ua->get("$config->{api_endpoint}/url_list")->{res}->{content}->{asset}->{content};
+    $url_list = decode_json($content);
     $reload = 0;
     foreach my $row (@$url_list) {
         last if ($term || $reload);
         if (my $pid = fork()) {
             $kids{$pid} = $pid;
         } else {
-            say($row->{url});
+            say STDERR $row->{url};
             check_url($row);
             exit;
         }
