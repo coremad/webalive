@@ -1,11 +1,9 @@
-# A Docker Compose must always start with the version tag.
-# We use '3' because it's the last version.
-version: '3'
+version: "3.2"
 
 services:
   pg_db:
     container_name: postgres
-    image: 'postgres:14'
+    image: "postgres:14"
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
@@ -13,7 +11,8 @@ services:
     volumes:
       - ./sql/dump.sql:/docker-entrypoint-initdb.d/dump.sql
   web:
-    container_name: webalive
+    container_name: "webalive"
+    image: "madcore/mojolicious"
     #    restart: on-failure
     depends_on:
       - pg_db
@@ -27,11 +26,12 @@ services:
       - 3000:3000
     volumes:
       - type: bind
-        source: .
-        target: /usr/src/app/
-    working_dir: /usr/src/app/
+        source: "."
+        target: "/usr/src/app/"
+    working_dir: "/usr/src/app/"
   daemon:
-    container_name: poold
+    container_name: "poold"
+    image: "madcore/mojolicious"
     restart: on-failure
     depends_on:
       - web
@@ -44,5 +44,5 @@ services:
     volumes:
       - type: bind
         source: .
-        target: /usr/src/app/
-    working_dir: /usr/src/app/
+        target: "/usr/src/app/"
+    working_dir: "/usr/src/app/"

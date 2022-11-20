@@ -51,7 +51,7 @@ sub REAPER {
 
 $SIG{HUP} = \&init;
 
-$SIG{$_}  = sub { $term = 1; unlink $config->{pid_file}; } for('INT', 'TERM', 'QUIT');
+$SIG{$_}  = sub { $term = 1; } for('INT', 'TERM', 'QUIT');
 
 $SIG{USR1} = sub {
     my $ua  = Mojo::UserAgent->new;
@@ -62,10 +62,6 @@ $SIG{USR1} = sub {
 };
 
 init();
-
-open my $pf, ">$config->{pid_file}";
-print $pf $$;
-close $pf;
 
 do {
     my $ua  = Mojo::UserAgent->new;
@@ -88,8 +84,6 @@ do {
     }
     sleep(1) until ($next_time <= time() or $term or $reload);
 } until ( $term );
-
-unlink $config->{pid_file};
 
 my $kid;
 do {
