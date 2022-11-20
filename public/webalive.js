@@ -83,7 +83,7 @@ $( document ).ready(function() {
                     $.get('api/url_count').done(function(data){
                         nrcount = data;
                     });
-                    sleep(100);
+                    sleep(1000);
                 } while (rcount == nrcount && maxwait--);
                 $('#err').html(data);
                 refresh_table();

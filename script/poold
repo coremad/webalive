@@ -5,6 +5,7 @@ use warnings FATAL => 'all';
 use Mojo::Base 'Mojolicious::Controller', -signatures;
 use Mojo::UserAgent;
 use Mojo::File qw(curfile);
+use Mojo::Log;
 use YAML qw(LoadFile);
 use JSON;
 use POSIX ":sys_wait_h";
@@ -14,7 +15,7 @@ use Data::Dumper;
 my $config;
 my $url_list;
 my %kids;
-
+my $log = Mojo::Log->new;
 my $term = 0;
 my $reload = 0;
 
@@ -69,7 +70,7 @@ close $pf;
 do {
     my $ua  = Mojo::UserAgent->new;
     my $next_time = $config->{pool_interval} + time();
-    say STDERR ">>\t" . localtime;
+    $log->info(" Start checks");
     my $content;
     sleep(1) until $content = $ua->get("$config->{api_endpoint}/url_list")->{res}->{content}->{asset}->{content};
     $url_list = decode_json($content);
@@ -79,7 +80,7 @@ do {
         if (my $pid = fork()) {
             $kids{$pid} = $pid;
         } else {
-            say STDERR $row->{url};
+            $log->info($row->{url});
             check_url($row);
             exit;
         }

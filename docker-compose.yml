@@ -7,11 +7,9 @@ services:
     container_name: postgres
     image: 'postgres:14'
     environment:
-      POSTGRES_USER: admin # The PostgreSQL user (useful to connect to the database)
-      POSTGRES_PASSWORD: admin  # The PostgreSQL password (useful to connect to the database)
-      POSTGRES_DB: test # The PostgreSQL default database (automatically created at first launch)
-    networks:
-      - db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: test
     volumes:
       - ./sql/dump.sql:/docker-entrypoint-initdb.d/dump.sql
   web:
@@ -19,9 +17,8 @@ services:
     #    restart: on-failure
     depends_on:
       - pg_db
-    networks:
-      - db
-      - webapp
+    links:
+      - pg_db
     build:
       context: .
       dockerfile: Dockerfile
@@ -38,10 +35,8 @@ services:
     restart: on-failure
     depends_on:
       - web
-    networks:
-      - webapp
-    ports:
-      - 3001:3001
+    links:
+      - web
     build:
       context: .
       dockerfile: Dockerfile
@@ -51,6 +46,3 @@ services:
         source: .
         target: /usr/src/app/
     working_dir: /usr/src/app/
-networks:
-  db:
-  webapp:

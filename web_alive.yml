@@ -12,7 +12,8 @@ dbconn:
 max_workers: 5
 max_headers: 3
 pool_interval: 60
+log_dir: './log/'
 pid_file: './tmp/webpoold.pid'
 api_endpoint: 'http://web:3000/api'
 
-daemon_endpoint: daemon:3001
+#daemon_endpoint: daemon:3001
