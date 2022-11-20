@@ -12,7 +12,8 @@ sub list ($self) {
 }
 
 sub add ($self) {
-  my $id = $keeper->add_url($self->param("url"));
+  my $url = $self->param("url") or ($self->render(text => "bad req") and return(0));
+  my $id = $keeper->add_url($url);
   if ($id == -1) {
     $self->render(text => "already exists");
     return(0);

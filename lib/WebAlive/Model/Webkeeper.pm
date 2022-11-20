@@ -15,11 +15,20 @@ sub new {
     my $self = bless {}, $class;
     $config = shift or $config = WebAlive::myconfig;
     my $dbconn = $config->{dbconn};
-    $dbh = DBI -> connect("dbi:Pg:dbname=$dbconn->{dbname};host=$dbconn->{host};port=$dbconn->{port}",
-        $dbconn->{username},
-        $dbconn->{password},
-        { AutoCommit => 1, RaiseError => 0 }
-    ) or die $DBI::errstr;
+    say STDERR "WTF?!";
+    do {
+    sleep 1;
+
+
+
+    eval {
+        $dbh = DBI->connect("dbi:Pg:dbname=$dbconn->{dbname};host=$dbconn->{host};port=$dbconn->{port}",
+            $dbconn->{username},
+            $dbconn->{password},
+            { AutoCommit => 1, RaiseError => 0 });
+            say STDERR Dumper($dbh);
+        };
+    } until ($dbh);
     return($self);
 }
 
