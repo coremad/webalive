@@ -3,18 +3,18 @@ use strict;
 use warnings FATAL => 'all';
 use Mojo::Base 'Mojolicious', -signatures;
 use WebAlive;
-use JSON;
 use DBI;
 
 use Data::Dumper;
 
 my $dbh;
+my $config;
 
 sub new {
     my $class = shift;
     my $self = bless {}, $class;
-    my $dbconn;
-    $dbconn = shift or $dbconn = WebAlive::myconfig->{dbconn};
+    $config = shift or $config = WebAlive::myconfig;
+    my $dbconn = $config->{dbconn};
     $dbh = DBI -> connect("dbi:Pg:dbname=$dbconn->{dbname};host=$dbconn->{host};port=$dbconn->{port}",
         $dbconn->{username},
         $dbconn->{password},
@@ -27,11 +27,11 @@ sub list ($self) {
     my $sql = 'SELECT * FROM "logs_list"';
     my $sth = $dbh->prepare($sql);
     $sth -> execute();
-    my $rows = $sth->fetchall_hashref('id');
+    my $rows = $sth->fetchall_hashref('url_id');
     foreach my $k (keys %{$rows}) {
         my $sql = 'SELECT * FROM "headers_list" WHERE log_id = ?';
         my $sth = $dbh->prepare($sql);
-        $sth -> execute($k);
+        $sth -> execute($rows->{$k}->{id});
         $rows->{$k}->{headers} = $sth->fetchall_arrayref();
     }
     return($rows);
@@ -41,16 +41,24 @@ sub add_url {
     my ($self, $url) =  @_;
     my $sql = 'INSERT INTO observables (url) VALUES ( ? )  ON CONFLICT DO NOTHING returning id';
     my $sth = $dbh->prepare($sql);
-    eval {say STDERR Dumper($sth -> execute($url));};
-    # say STDERR $sth->fetchrow_hashref()->{id};
+    my $res = $sth -> execute($url) or return(0);
+    return(-1) if $res == "0E0";
     return($sth->fetchrow_hashref()->{id});
+}
+
+sub get_new_urls($self) {
+    my $sql = 'SELECT u.id, u.url  FROM observables as u LEFT JOIN logs as l ON l.url_id = u.id where l.url_id IS NULL ORDER BY u.id DESC';
+    my $sth = $dbh->prepare($sql);
+    $sth -> execute();
+    my $url_hash = $sth -> fetchall_hashref('id');
+    return map { $url_hash->{$_} } keys %$url_hash;
 }
 
 sub del_url {
     my ($self, $id) =  @_;
     my $sql = 'DELETE FROM observables WHERE id = ?';
     my $sth = $dbh->prepare($sql);
-    eval {say STDERR Dumper($sth -> execute($id));};
+    $sth -> execute($id);
 }
 
 sub ins_val {
@@ -68,17 +76,17 @@ sub ins_val {
 }
 
 sub ins_log {
-    my ($url_id, $status) = @_;
+    my ($self, $url_id, $status) = @_;
     my $sql = "INSERT INTO logs(url_id, status) VALUES( ?, ? ) returning id";
     my $sth = $dbh->prepare($sql);
-    $sth -> execute($url_id, $status);
+    $sth -> execute($url_id, $status) or return(0);
     return $sth->fetchrow_hashref()->{id}
 }
 
 sub ins_header {
-    my ($log_id, $header_name, $header) = @_;
+    my ($self, $log_id, $header_name, $header) = @_;
     my $name_id = ins_val('header_names', 'name', $header_name);
-    my $val_id = ins_val('header_values', 'val', encode_json($header));
+    my $val_id = ins_val('header_values', 'val', $header);
     my $sql = "INSERT INTO headers(log_id, hn_id, hv_id) VALUES( ?, ?, ? )";
     my $sth = $dbh->prepare($sql);
     $sth->execute($log_id, $name_id, $val_id);
@@ -91,42 +99,28 @@ sub get_url_by_id($id) {
     return $sth->fetchrow_hashref();
 }
 
-sub check_url {
-    my ($self, $row) = @_;
-    my $ua  = Mojo::UserAgent->new;
-    my $res;
-    $row = get_url_by_id($row) unless (ref($row) eq 'HASH');
-    eval {$res = $ua->get($row->{url})->result;};
-    my $log_id = ins_log($row->{id}, $res->{code});
-    return (0) unless exists $res->{code} and exists $res->headers->{headers};
-    my $headers = $res->headers->{headers};
-    my $header_count = 3;
-    foreach my $header_name (keys %{$headers}) {
-        ins_header($log_id, $header_name, $headers->{$header_name});
-        --$header_count or last();
-    }
-}
-
 sub url_list {
     my $self = shift;
-    my $sql = 'SELECT * FROM "observables" WHERE enabled = true';
+    my $sql = 'SELECT id, url FROM "observables" WHERE enabled = true';
     my $sth = $dbh->prepare($sql);
     $sth -> execute();
     my $url_hash = $sth -> fetchall_hashref('id');
-    return map { $url_hash->{$_} } keys %$url_hash;
+    return map { $url_hash->{$_} } sort  {$a < $b} keys %$url_hash;
 }
 
-sub check_all {
+sub url_count {
     my $self = shift;
-    my $sql = 'SELECT * FROM "observables" WHERE enabled = true';
+    my $sql = 'select count(*) from logs_list';
     my $sth = $dbh->prepare($sql);
     $sth -> execute();
-    while (my $row = $sth->fetchrow_hashref()) {
-        $self->check_url($row);
-    }
+    my $res = $sth -> fetchrow_arrayref();
+    say "rows: $res->[0]";
+    return $res->[0];
 }
+
+
 sub DESTROY($self) {
-    $dbh->disconnect;
+    $dbh->disconnect if $dbh;
 }
 
 1;

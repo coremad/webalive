@@ -5,28 +5,41 @@ use warnings FATAL => 'all';
 use Mojo::Base 'Mojolicious::Controller', -signatures;
 use Mojo::UserAgent;
 use Mojo::File qw(curfile);
-use lib curfile->dirname->sibling('lib')->to_string;
-use WebAlive::Model::Webkeeper;
+use YAML qw(LoadFile);
+use JSON;
+use POSIX ":sys_wait_h";
 
 use Data::Dumper;
 
-my $dbconn = {
-    dbname => 'test',
-    host => 'localhost',
-    port => 5432,
-    username => 'admin',
-    password => 'admin',
-};
-
-my $keeper = WebAlive::Model::Webkeeper->new($dbconn);
-my @url_list = $keeper->url_list;
-$keeper = undef;
-
-use POSIX ":sys_wait_h";
-
-my $max_workers = 5;
-
+my $config;
+my $url_list;
 my %kids;
+
+my $term = 0;
+my $reload = 0;
+
+sub init {
+    $config = LoadFile(curfile->dirname->sibling('web_alive.yml')->to_string);
+    $reload = 1;
+}
+
+sub check_url {
+    my ($row) = @_;
+    my $ua  = Mojo::UserAgent->new;
+    my $res;
+    my $api = $config->{api_endpoint};
+    eval {$res = $ua->get($row->{url})->result;};
+    my $log_id = decode_json($ua->post("$api/ins_log" => {Accept => '*/*'} => json =>
+        { id => $row->{id}, code => $res->{code}})->{res}->{content}->{asset}->{content} )->{log_id};
+    return (0) unless exists $res->{code} and exists $res->headers->{headers};
+    my $headers = $res->headers->{headers};
+    my $header_count = $config->{max_headers};
+    foreach my $header_name (keys %{$headers}) {
+        $ua->post("$api/ins_headers" => {Accept => '*/*'} => json =>
+            { log_id => $log_id, header_name => $header_name, headers => encode_json($headers->{$header_name})});
+        --$header_count or last();
+    }
+}
 
 $SIG{CHLD} = \&REAPER;
 sub REAPER {
@@ -35,23 +48,47 @@ sub REAPER {
     $SIG{CHLD} = \&REAPER;
 }
 
-foreach my $row(@url_list) {
-    if (my $pid = fork()) {
-        $kids{$pid} = $pid;
-    } else {
-        say ($row->{url});
-        my $keeper = WebAlive::Model::Webkeeper->new($dbconn);
-        $keeper->check_url($row);
-        $keeper = undef;
-        exit;
+$SIG{HUP} = \&init;
+
+$SIG{$_}  = sub { $term = 1; unlink $config->{pid_file}; } for('INT', 'TERM', 'QUIT');
+
+$SIG{USR1} = sub {
+    my $ua  = Mojo::UserAgent->new;
+    my $new_urls = (decode_json($ua->get("$config->{api_endpoint}/new_urls")->{res}->{content}->{asset}->{content}));
+    foreach my $row (@$new_urls) {
+        check_url($row);
     }
-    delete($kids{waitpid(-1, 0)}) while ($max_workers <= scalar keys %kids);
-}
+};
+
+init();
+
+open my $pf, ">$config->{pid_file}";
+print $pf $$;
+close $pf;
+
+do {
+    my $ua  = Mojo::UserAgent->new;
+    my $next_time = $config->{pool_interval} + time();
+    say ">>\t" . localtime;
+    $url_list = decode_json($ua->get("$config->{api_endpoint}/url_list")->{res}->{content}->{asset}->{content});
+    $reload = 0;
+    foreach my $row (@$url_list) {
+        last if ($term || $reload);
+        if (my $pid = fork()) {
+            $kids{$pid} = $pid;
+        } else {
+            say($row->{url});
+            check_url($row);
+            exit;
+        }
+        delete($kids{waitpid(-1, 0)}) while ($config->{max_workers} <= scalar keys %kids);
+    }
+    sleep(1) until ($next_time <= time() or $term or $reload);
+} until ( $term );
+
+unlink $config->{pid_file};
 
 my $kid;
 do {
     $kid = waitpid(-1, 0);
 } while ($kid > 0 and delete($kids{$kid}));
-
-
-# $keeper->check_all;
