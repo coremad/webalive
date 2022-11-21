@@ -11,6 +11,8 @@ use POSIX ":sys_wait_h";
 
 use v5.20;
 
+use Data::Dumper;
+
 my $config;
 my $url_list;
 my %kids;
@@ -19,12 +21,7 @@ my $term = 0;
 my $reload = 0;
 
 sub init {
-    $config = undef;
-    do {
-        eval { $config = LoadFile(curfile->dirname->sibling('web_alive.yml')->to_string) };
-        die if $term;
-        sleep 3 unless $config;
-    } until ($config);
+    $config = LoadFile(curfile->dirname->sibling('web_alive.yml')->to_string) or die("config web_alive.yml not found");
     $reload = 1;
 }
 
@@ -35,16 +32,15 @@ sub check_url {
     my $api = $config->{api_endpoint};
     eval { $res = $ua->get($row->{url})->result; };
     my $post_res = $ua->post("$api/ins_log" => {Accept => '*/*'} => json =>
-        { id => $row->{id}, code => $res->{code}})->{res};
-    # $log->error(Dumper $post_res);
-    return unless ($post_res and exists($post_res->{code}) and ($post_res->{code} eq '200'));
-    my $log_id = $post_res->json->{log_id} or return;
-    return (0) unless (exists $res->{code} and exists $res->headers->{headers});
+        { id => $row->{id}, code => $res->{code}})->result;
+    $log->info($row->{url});
+    return unless ($post_res and $post_res->is_success and $post_res->code == 200 and $post_res->text =~ /^\d+$/);
+    return unless ($res and exists $res->{code} and exists $res->headers->{headers});
     my $headers = $res->headers->{headers};
     my $header_count = $config->{max_headers};
     foreach my $header_name (keys %{$headers}) {
         $ua->post("$api/ins_headers" => {Accept => '*/*'} => json =>
-            { log_id => $log_id, header_name => $header_name, headers => encode_json($headers->{$header_name})});
+            { log_id => $post_res->text, header_name => $header_name, headers => encode_json($headers->{$header_name})});
         --$header_count or last();
     }
 }
@@ -64,8 +60,6 @@ $SIG{ALRM} = sub {$log->error("WTF?!"); sleep(1)};
 
 init();
 
-use Data::Dumper;
-
 do {{
     my $ua = Mojo::UserAgent->new;
     my $next_time = $config->{pool_interval} + time();
@@ -75,18 +69,17 @@ do {{
         sleep(1) until ($res = $ua->get("$config->{api_endpoint}/url_list")->result and $res->{code} == 200);
     };
     $reload = 0;
-    if ($res and $url_list = $res->json) {
+    if ($res and $url_list = $res->json and (ref $url_list eq 'ARRAY')) {
         foreach my $row (@$url_list) {
             last if ($term || $reload);
             if (my $pid = fork()) {
                 $kids{$pid} = $pid;
             }
             else {
-                $log->info($row->{url});
                 check_url($row);
                 exit;
             }
-            delete($kids{waitpid(-1, 0)}) while ($config->{max_workers} <= scalar keys %kids);
+            delete($kids{waitpid(-1, 0)}) while ($config->{max_workers} < scalar keys %kids);
         }
     } else {
         $log->error("Something wrong with backend");

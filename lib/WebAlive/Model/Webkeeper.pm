@@ -29,13 +29,11 @@ sub new {
 }
 
 sub list ($self) {
-    my $sql = 'SELECT * FROM "logs_list"';
-    my $sth = $dbh->prepare($sql);
+    my $sth = $dbh->prepare('SELECT * FROM "logs_list"');
     $sth -> execute();
     my $rows = $sth->fetchall_hashref('url_id');
     foreach my $k (keys %{$rows}) {
-        my $sql = 'SELECT * FROM "headers_list" WHERE log_id = ?';
-        my $sth = $dbh->prepare($sql);
+        my $sth = $dbh->prepare('SELECT * FROM "headers_list" WHERE log_id = ?');
         $sth -> execute($rows->{$k}->{id});
         $rows->{$k}->{headers} = $sth->fetchall_arrayref();
     }
@@ -44,7 +42,7 @@ sub list ($self) {
 
 sub add_url {
     my ($self, $url) =  @_;
-    my $sql = 'INSERT INTO urls (url) VALUES ( ? )  ON CONFLICT DO NOTHING returning id';
+    my $sql = 'INSERT INTO urls (url) VALUES ( ? ) ON CONFLICT DO NOTHING RETURNING id';
     my $sth = $dbh->prepare($sql);
     my $res = $sth -> execute($url) or return(0);
     return(-1) if $res eq "0E0";
@@ -55,7 +53,7 @@ sub get_new_urls($self) {
     my $sth = $dbh->prepare('SELECT * FROM new_urls');
     $sth -> execute();
     my $url_hash = $sth -> fetchall_hashref('id');
-    return map { $url_hash->{$_} } keys %$url_hash;
+    return [map { $url_hash->{$_} } keys %$url_hash];
 }
 
 sub new_urls_count($self) {
@@ -66,9 +64,8 @@ sub new_urls_count($self) {
 
 sub del_url {
     my ($self, $id) =  @_;
-    my $sql = 'DELETE FROM urls WHERE id = ?';
-    my $sth = $dbh->prepare($sql);
-    $sth -> execute($id);
+    my $sth = $dbh->prepare('DELETE FROM urls WHERE id = ?');
+    return $sth -> execute($id);
 }
 
 sub ins_val {
@@ -78,8 +75,7 @@ sub ins_val {
     if ($sth->execute("$str") and my $tmp = $sth->fetchrow_hashref() ) {
         return($tmp->{id});
     }
-    $sql = "SELECT id FROM $table WHERE $col = ?";
-    $sth = $dbh->prepare($sql);
+    $sth = $dbh->prepare("SELECT id FROM $table WHERE $col = ?");
     $sth -> execute("$str") and return $sth->fetchrow_hashref()->{id};
 
     return(0);
@@ -97,31 +93,25 @@ sub ins_header {
     my ($self, $log_id, $header_name, $header) = @_;
     my $name_id = ins_val('header_names', 'name', $header_name);
     my $val_id = ins_val('header_values', 'val', $header);
-    my $sql = "INSERT INTO headers(log_id, hn_id, hv_id) VALUES( ?, ?, ? )";
-    my $sth = $dbh->prepare($sql);
+    my $sth = $dbh->prepare("INSERT INTO headers(log_id, hn_id, hv_id) VALUES( ?, ?, ? )");
     $sth->execute($log_id, $name_id, $val_id);
 }
 
 sub get_url_by_id($id) {
-    my $sql = 'SELECT * FROM "urls" WHERE id = ?';
-    my $sth = $dbh->prepare($sql);
+    my $sth = $dbh->prepare('SELECT * FROM "urls" WHERE id = ?');
     $sth -> execute($id);
     return $sth->fetchrow_hashref();
 }
 
-sub url_list {
-    my $self = shift;
-    my $sql = 'SELECT id, url FROM "urls" WHERE enabled = true';
-    my $sth = $dbh->prepare($sql);
+sub url_list($self) {
+    my $sth = $dbh->prepare('SELECT id, url FROM "urls" WHERE enabled = true');
     $sth -> execute();
     my $url_hash = $sth -> fetchall_hashref('id');
-    return map { $url_hash->{$_} } sort  {$a < $b} keys %$url_hash;
+    return [map { $url_hash->{$_} } sort  {$a < $b} keys %$url_hash];
 }
 
-sub url_count {
-    my $self = shift;
-    my $sql = 'select count(*) from logs_list';
-    my $sth = $dbh->prepare($sql);
+sub url_count($self) {
+    my $sth = $dbh->prepare('SELECT COUNT(*) FROM logs_list');
     $sth -> execute();
     my $res = $sth -> fetchrow_arrayref();
     return $res->[0];

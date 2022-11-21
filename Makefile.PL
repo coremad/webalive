@@ -10,7 +10,6 @@ WriteMakefile(
     'YAML',
     'DBI',
     'DBD::Pg',
-    'JSON'
   },
   test => {TESTS => 't/*.t'}
 );

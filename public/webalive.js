@@ -52,6 +52,7 @@ function wait_update() {
         jQuery.ajaxSetup({async:false});
         $.get('api/new_urls_count').done(function(data) { nrcount = data;});
         jQuery.ajaxSetup({async:true});
+        console.log(nrcount +" \t"+ maxwait);
         if (nrcount != 0) sleep(1000);
     } while (nrcount != 0 && maxwait--);
     return nrcount;
@@ -82,10 +83,6 @@ $( document ).ready(function() {
         if (confirm("add " + url))
             if (validURL(url)) {
                 $('#err').html('working...');
-                var rcount = 0;
-                $.get('api/url_count').done(function(data){
-                    rcount = data;
-                });
                 res = $.post("api/add", {
                     url: url,
                 }).done(function (data) {
@@ -94,7 +91,8 @@ $( document ).ready(function() {
                     $('#err').html(resp);
                     refresh_table();
                 }).fail(function() { $('#err').html( "error" ) });
-            } else $('#err').html("URL '" + url + "' is bullshit");
+            } else $('#err').html("URL '" + url + "' is bullshit")
+        else $('#err').html("");
         event.preventDefault();
     });
 });
