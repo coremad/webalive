@@ -45,6 +45,18 @@ function sleep(milliseconds) {
   } while (currentDate - date < milliseconds);
 }
 
+function wait_update() {
+    var maxwait = 30;
+    var nrcount = 1;
+    do {
+        jQuery.ajaxSetup({async:false});
+        $.get('api/new_urls_count').done(function(data) { nrcount = data;});
+        jQuery.ajaxSetup({async:true});
+        if (nrcount != 0) sleep(1000);
+    } while (nrcount != 0 && maxwait--);
+    return nrcount;
+}
+
 $( document ).ready(function() {
 
     refresh_table();
@@ -60,7 +72,7 @@ $( document ).ready(function() {
                 }).done(function (data) {
                         $('#err').html(data);
                         refresh_table();
-                }).fail(function(data){ console.log(data);$('#err').html("wtf " + data)});
+                }).fail(function(data){ $('#err').html("wtf")});
             }
             event.preventDefault();
     });
@@ -77,18 +89,11 @@ $( document ).ready(function() {
                 res = $.post("api/add", {
                     url: url,
                 }).done(function (data) {
-                    var nrcount = rcount;
-                    maxwait = 60;
-                    if (data == 'ok') do {
-                        jQuery.ajaxSetup({async:false});
-                        $.get('api/url_count').done(function(data){
-                            nrcount = data;
-                        });
-                        if (rcount == nrcount) sleep(1000);
-                    } while (rcount == nrcount && maxwait--);
-                    $('#err').html(data);
+                    var resp = data;
+                    if (resp == 'ok' && wait_update() != 0) resp = 'time out';
+                    $('#err').html(resp);
                     refresh_table();
-                });
+                }).fail(function() { $('#err').html( "error" ) });
             } else $('#err').html("URL '" + url + "' is bullshit");
         event.preventDefault();
     });

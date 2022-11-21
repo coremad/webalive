@@ -222,6 +222,21 @@ CREATE VIEW public.logs_list AS
 ALTER TABLE public.logs_list OWNER TO admin;
 
 --
+-- Name: new_urls; Type: VIEW; Schema: public; Owner: admin
+--
+
+CREATE VIEW public.new_urls AS
+ SELECT u.id,
+    u.url
+   FROM (public.urls u
+     LEFT JOIN public.logs l ON ((l.url_id = u.id)))
+  WHERE (l.url_id IS NULL)
+  ORDER BY u.id DESC;
+
+
+ALTER TABLE public.new_urls OWNER TO admin;
+
+--
 -- Name: urls_id_seq; Type: SEQUENCE; Schema: public; Owner: admin
 --
 

@@ -47,16 +47,21 @@ sub add_url {
     my $sql = 'INSERT INTO urls (url) VALUES ( ? )  ON CONFLICT DO NOTHING returning id';
     my $sth = $dbh->prepare($sql);
     my $res = $sth -> execute($url) or return(0);
-    return(-1) if $res == "0E0";
+    return(-1) if $res eq "0E0";
     return($sth->fetchrow_hashref()->{id});
 }
 
 sub get_new_urls($self) {
-    my $sql = 'SELECT u.id, u.url  FROM urls as u LEFT JOIN logs as l ON l.url_id = u.id where l.url_id IS NULL ORDER BY u.id DESC';
-    my $sth = $dbh->prepare($sql);
+    my $sth = $dbh->prepare('SELECT * FROM new_urls');
     $sth -> execute();
     my $url_hash = $sth -> fetchall_hashref('id');
     return map { $url_hash->{$_} } keys %$url_hash;
+}
+
+sub new_urls_count($self) {
+    my $sth = $dbh->prepare('SELECT COUNT(*) FROM new_urls');
+    $sth -> execute();
+    return $sth -> fetchrow_hashref()->{count};
 }
 
 sub del_url {

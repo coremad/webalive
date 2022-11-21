@@ -12,8 +12,6 @@ sub list ($self) {
   $self->render(text => encode_json($keeper->list));
 }
 
-
-
 sub check_url {
   my ($self, $row) = @_;
   my $ua  = Mojo::UserAgent->new;
@@ -72,31 +70,29 @@ sub del ($self) {
 
 sub url_list($self) {
   my @urls = $keeper->url_list;
-  $self->render(text => encode_json(\@urls));
+  $self->render(json => \@urls);
 }
 sub url_count($self) {
   $self->render(text => $keeper->url_count);
 }
-
-
 
 sub new_urls($self) {
   my @urls = $keeper->get_new_urls;
   $self->render(text => encode_json(\@urls));
 }
 
-sub ins_log($self) {
-  my $req = $self->{tx}->{req}->{content}->{asset}->{content};
-  my $row = decode_json($req);
-  my $log_id = $keeper->ins_log($row->{id}, $row->{code});
+sub new_urls_count($self) {
+  $self->render(text => $keeper->new_urls_count);
+}
 
+sub ins_log($self) {
+  my $row = $self->{tx}->{req}->json;
+  my $log_id = $keeper->ins_log($row->{id}, $row->{code});
   $self->render(text => encode_json({ log_id => $log_id }));
 }
 
-
 sub ins_headers($self) {
-  my $req = $self->{tx}->{req}->{content}->{asset}->{content};
-  my $row = decode_json($req);
+  my $row = $self->{tx}->{req}->json;
   $keeper->ins_header($row->{log_id}, $row->{header_name}, $row->{headers});
   $self->render(text => 'ok');
 }

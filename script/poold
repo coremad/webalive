@@ -36,7 +36,8 @@ sub check_url {
     eval { $res = $ua->get($row->{url})->result; };
     my $post_res = $ua->post("$api/ins_log" => {Accept => '*/*'} => json =>
         { id => $row->{id}, code => $res->{code}})->{res};
-    return unless ($post_res and $post_res->{code} == '200');
+    # $log->error(Dumper $post_res);
+    return unless ($post_res and exists($post_res->{code}) and ($post_res->{code} eq '200'));
     my $log_id = $post_res->json->{log_id} or return;
     return (0) unless (exists $res->{code} and exists $res->headers->{headers});
     my $headers = $res->headers->{headers};
@@ -65,13 +66,13 @@ init();
 
 use Data::Dumper;
 
-do {
+do {{
     my $ua = Mojo::UserAgent->new;
     my $next_time = $config->{pool_interval} + time();
-    $log->info(" Start checks");
+    $log->info(">\tStart checks");
     my $res;
     eval {
-        sleep(1) until ($res = $ua->get("$config->{api_endpoint}/url_list")->result and $res->{code} == '200');
+        sleep(1) until ($res = $ua->get("$config->{api_endpoint}/url_list")->result and $res->{code} == 200);
     };
     $reload = 0;
     if ($res and $url_list = $res->json) {
@@ -92,8 +93,9 @@ do {
         sleep 3;
         $reload = 1;
     }
+    $log->info(">\tDone, still running children:  " . scalar keys %kids);
     sleep(1) until ($next_time <= time() or $term or $reload);
-} until ( $term );
+}} until ( $term );
 
 my $kid;
 do {
