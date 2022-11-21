@@ -12,7 +12,7 @@ function refresh_table() {
             content += '<tr class="tline' + c + '">'
                  + '<td><img class="del_url" src="del.png" url="'+data[key]['url']+'" data = "'+data[key]['url_id']+'"></img></td>'
                  + '<td>' + data[key]['url'] + '</td>'
-                 + '<td>' + data[key]['date'].split('.')[0] + '</td>'
+                 + '<td>' +  data[key]['date'].split('.')[0] + '</td>'
                  + '<td class="'+ sclass +'">' + status + '</td>'
                  + '<td>'
                  + '<table class="hlist"><tr>';
@@ -67,28 +67,29 @@ $( document ).ready(function() {
 
     $( "#addform" ).submit(function( event ) {
         var url = $("#url").val();
-        if (validURL(url) && confirm("add " + url)) {
-            $('#err').html('working...');
-            var rcount = 0;
-            $.get('api/url_count').done(function(data){
-                rcount = data;
-            });
-            res = $.post("api/add", {
-                url: url,
-            }).done(function (data) {
-                var nrcount = rcount;
-                maxwait = 120;
-                if (data == 'ok') do {
-                    jQuery.ajaxSetup({async:false});
-                    $.get('api/url_count').done(function(data){
-                        nrcount = data;
-                    });
-                    sleep(1000);
-                } while (rcount == nrcount && maxwait--);
-                $('#err').html(data);
-                refresh_table();
-            });
-        } else $('#err').html("URL '" + url + "' is bullshit");
+        if (confirm("add " + url))
+            if (validURL(url)) {
+                $('#err').html('working...');
+                var rcount = 0;
+                $.get('api/url_count').done(function(data){
+                    rcount = data;
+                });
+                res = $.post("api/add", {
+                    url: url,
+                }).done(function (data) {
+                    var nrcount = rcount;
+                    maxwait = 60;
+                    if (data == 'ok') do {
+                        jQuery.ajaxSetup({async:false});
+                        $.get('api/url_count').done(function(data){
+                            nrcount = data;
+                        });
+                        if (rcount == nrcount) sleep(1000);
+                    } while (rcount == nrcount && maxwait--);
+                    $('#err').html(data);
+                    refresh_table();
+                });
+            } else $('#err').html("URL '" + url + "' is bullshit");
         event.preventDefault();
     });
 });
