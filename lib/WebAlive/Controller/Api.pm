@@ -2,9 +2,8 @@ package WebAlive::Controller::Api;
 use Mojo::Base 'Mojolicious::Controller', -signatures;
 use Mojo::UserAgent;
 use WebAlive::Model::Webkeeper;
+use Mojo::JSON qw(decode_json encode_json);
 use WebAlive;
-
-use JSON;
 
 my $keeper = WebAlive::Model::Webkeeper->new;
 my $config;

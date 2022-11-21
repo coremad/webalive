@@ -2,13 +2,14 @@
 use strict;
 use warnings FATAL => 'all';
 
-use Mojo::Base 'Mojolicious::Controller', -signatures;
 use Mojo::UserAgent;
 use Mojo::File qw(curfile);
+use Mojo::JSON qw(encode_json);
 use Mojo::Log;
 use YAML qw(LoadFile);
-use JSON;
 use POSIX ":sys_wait_h";
+
+use v5.20;
 
 my $config;
 my $url_list;
@@ -18,7 +19,12 @@ my $term = 0;
 my $reload = 0;
 
 sub init {
-    $config = LoadFile(curfile->dirname->sibling('web_alive.yml')->to_string);
+    $config = undef;
+    do {
+        eval { $config = LoadFile(curfile->dirname->sibling('web_alive.yml')->to_string) };
+        die if $term;
+        sleep 3 unless $config;
+    } until ($config);
     $reload = 1;
 }
 
@@ -27,10 +33,12 @@ sub check_url {
     my $ua  = Mojo::UserAgent->new;
     my $res;
     my $api = $config->{api_endpoint};
-    eval {$res = $ua->get($row->{url})->result;};
-    my $log_id = decode_json($ua->post("$api/ins_log" => {Accept => '*/*'} => json =>
-        { id => $row->{id}, code => $res->{code}})->{res}->{content}->{asset}->{content} )->{log_id};
-    return (0) unless exists $res->{code} and exists $res->headers->{headers};
+    eval { $res = $ua->get($row->{url})->result; };
+    my $post_res = $ua->post("$api/ins_log" => {Accept => '*/*'} => json =>
+        { id => $row->{id}, code => $res->{code}})->{res};
+    return unless ($post_res and $post_res->{code} == '200');
+    my $log_id = $post_res->json->{log_id} or return;
+    return (0) unless (exists $res->{code} and exists $res->headers->{headers});
     my $headers = $res->headers->{headers};
     my $header_count = $config->{max_headers};
     foreach my $header_name (keys %{$headers}) {
@@ -49,36 +57,40 @@ sub REAPER {
 
 $SIG{HUP} = \&init;
 
-$SIG{$_}  = sub { $term = 1; } for('INT', 'TERM', 'QUIT');
+$SIG{$_}  = sub { $term = 1; $log->info(" Exiting..." . scalar keys %kids);} for('INT', 'TERM', 'QUIT');
 
-$SIG{USR1} = sub {
-    my $ua  = Mojo::UserAgent->new;
-    my $new_urls = (decode_json($ua->get("$config->{api_endpoint}/new_urls")->{res}->{content}->{asset}->{content}));
-    foreach my $row (@$new_urls) {
-        check_url($row);
-    }
-};
+$SIG{ALRM} = sub {$log->error("WTF?!"); sleep(1)};
 
 init();
 
+use Data::Dumper;
+
 do {
-    my $ua  = Mojo::UserAgent->new;
+    my $ua = Mojo::UserAgent->new;
     my $next_time = $config->{pool_interval} + time();
     $log->info(" Start checks");
-    my $content;
-    sleep(1) until $content = $ua->get("$config->{api_endpoint}/url_list")->{res}->{content}->{asset}->{content};
-    $url_list = decode_json($content);
+    my $res;
+    eval {
+        sleep(1) until ($res = $ua->get("$config->{api_endpoint}/url_list")->result and $res->{code} == '200');
+    };
     $reload = 0;
-    foreach my $row (@$url_list) {
-        last if ($term || $reload);
-        if (my $pid = fork()) {
-            $kids{$pid} = $pid;
-        } else {
-            $log->info($row->{url});
-            check_url($row);
-            exit;
+    if ($res and $url_list = $res->json) {
+        foreach my $row (@$url_list) {
+            last if ($term || $reload);
+            if (my $pid = fork()) {
+                $kids{$pid} = $pid;
+            }
+            else {
+                $log->info($row->{url});
+                check_url($row);
+                exit;
+            }
+            delete($kids{waitpid(-1, 0)}) while ($config->{max_workers} <= scalar keys %kids);
         }
-        delete($kids{waitpid(-1, 0)}) while ($config->{max_workers} <= scalar keys %kids);
+    } else {
+        $log->error("Something wrong with backend");
+        sleep 3;
+        $reload = 1;
     }
     sleep(1) until ($next_time <= time() or $term or $reload);
 } until ( $term );

@@ -11,7 +11,7 @@ dbconn:
 
 max_workers: 5
 max_headers: 3
-pool_interval: 300
+pool_interval: 60
 api_endpoint: 'http://web:3000/api'
 
 #log_dir: './log/'
