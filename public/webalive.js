@@ -89,7 +89,7 @@ $( document ).ready(function() {
                     $('#err').html(data);
                     refresh_table();
                 });
-            } else $('#err').html("URL '" + url + "' is bullshit");
+            } else $('#err').html("URL '" + url + "' is bullshit") else $('#err').html("-");
         event.preventDefault();
     });
 });
