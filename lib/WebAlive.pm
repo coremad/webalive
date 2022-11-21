@@ -1,8 +1,6 @@
 package WebAlive;
 use Mojo::Base 'Mojolicious', -signatures;
 
-use Data::Dumper;
-
 my $config;
 # This method will run once at server start
 sub startup ($self) {

@@ -6,8 +6,6 @@ use Mojo::Log;
 use WebAlive;
 use DBI;
 
-use Data::Dumper;
-
 my $dbh;
 my $config;
 my $log;

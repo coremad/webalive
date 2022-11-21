@@ -10,8 +10,6 @@ use YAML qw(LoadFile);
 use JSON;
 use POSIX ":sys_wait_h";
 
-use Data::Dumper;
-
 my $config;
 my $url_list;
 my %kids;

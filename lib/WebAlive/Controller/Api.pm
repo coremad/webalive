@@ -6,8 +6,6 @@ use WebAlive;
 
 use JSON;
 
-use Data::Dumper;
-
 my $keeper = WebAlive::Model::Webkeeper->new;
 my $config;
 
