@@ -77,7 +77,7 @@ do {{
         foreach my $row (@$url_list) {
             last if ($term || $reload);
             if (my $pid = fork()) {
-                $kids{$pid} = $pid;
+                $kids{$pid} = time();
             }
             else {
                 check_url($row);

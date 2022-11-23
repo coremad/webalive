@@ -7,9 +7,8 @@ WriteMakefile(
   VERSION   => '0.01',
   PREREQ_PM => {
     'Mojolicious' => '9.22',
-    'YAML',
-    'DBI',
-    'DBD::Pg',
+    'YAML' => '',
+    'DBD::Pg' => '',
   },
   test => {TESTS => 't/*.t'}
 );
