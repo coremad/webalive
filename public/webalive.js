@@ -52,7 +52,6 @@ function wait_update() {
         jQuery.ajaxSetup({async:false});
         $.get('api/new_urls_count').done(function(data) { nrcount = data;});
         jQuery.ajaxSetup({async:true});
-        console.log(nrcount +" \t"+ maxwait);
         if (nrcount != 0) sleep(1000);
     } while (nrcount != 0 && maxwait--);
     return nrcount;

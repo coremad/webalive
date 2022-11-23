@@ -11,8 +11,6 @@ use POSIX ":sys_wait_h";
 
 use v5.20;
 
-use Data::Dumper;
-
 my $config;
 my $url_list;
 my %kids;
@@ -21,7 +19,8 @@ my $term = 0;
 my $reload = 0;
 
 sub init {
-    $config = LoadFile(curfile->dirname->sibling('web_alive.yml')->to_string) or die("config web_alive.yml not found");
+    $config = LoadFile(curfile->dirname->sibling('web_alive.yml')->to_string)
+        or die("config web_alive.yml not found");
     $reload = 1;
 }
 
@@ -34,13 +33,17 @@ sub check_url {
     my $post_res = $ua->post("$api/ins_log" => {Accept => '*/*'} => json =>
         { id => $row->{id}, code => $res->{code}})->result;
     $log->info($row->{url});
-    return unless ($post_res and $post_res->is_success and $post_res->code == 200 and $post_res->text =~ /^\d+$/);
-    return unless ($res and exists $res->{code} and exists $res->headers->{headers});
+    return unless ($post_res and $post_res->is_success
+        and $post_res->code == 200 and $post_res->text =~ /^\d+$/)
+        and ($res and exists $res->{code} and exists $res->headers->{headers});
     my $headers = $res->headers->{headers};
     my $header_count = $config->{max_headers};
     foreach my $header_name (keys %{$headers}) {
-        $ua->post("$api/ins_headers" => {Accept => '*/*'} => json =>
-            { log_id => $post_res->text, header_name => $header_name, headers => encode_json($headers->{$header_name})});
+        $ua->post("$api/ins_headers" => {Accept => '*/*'} => json => {
+            log_id => $post_res->text,
+            header_name => $header_name,
+            headers => encode_json($headers->{$header_name})
+        });
         --$header_count or last();
     }
 }
@@ -66,7 +69,8 @@ do {{
     $log->info(">\tStart checks");
     my $res;
     eval {
-        sleep(1) until ($res = $ua->get("$config->{api_endpoint}/url_list")->result and $res->{code} == 200);
+        sleep(1) until ($res = $ua->get("$config->{api_endpoint}/url_list")->result
+            and $res->{code} == 200);
     };
     $reload = 0;
     if ($res and $url_list = $res->json and (ref $url_list eq 'ARRAY')) {

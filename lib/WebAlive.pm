@@ -15,8 +15,8 @@ sub startup ($self) {
   my $r = $self->routes;
 
   # Normal route to controller
-  $r->get('/')->to('Test#welcome');
-  $r->get('/api/list')->to('Api#list');
+  $r->get('/')->to('General#glanga');
+  $r->get('/api/list')->to('Api#log_list');
   $r->get('/api/url_count')->to('Api#url_count');
   $r->get('/api/url_list')->to('Api#url_list');
   $r->get('/api/new_urls')->to('Api#new_urls');

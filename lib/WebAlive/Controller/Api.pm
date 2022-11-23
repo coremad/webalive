@@ -8,7 +8,7 @@ use WebAlive;
 my $keeper = WebAlive::Model::Webkeeper->new;
 my $config;
 
-sub list ($self) {
+sub log_list ($self) {
   $self->render(json => $keeper->list);
 }
 
