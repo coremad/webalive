@@ -17,19 +17,10 @@ sub startup ($self) {
   # Normal route to controller
   $r->get('/')->to('General#glanga');
   $r->get('/api/list')->to('Api#log_list');
-  $r->get('/api/url_count')->to('Api#url_count');
-  $r->get('/api/url_list')->to('Api#url_list');
-  $r->get('/api/new_urls')->to('Api#new_urls');
   $r->get('/api/new_urls_count')->to('Api#new_urls_count');
   $r->post('/api/add')->to('Api#add');
   $r->post('/api/del')->to('Api#del');
-  $r->post('/api/ins_log')->to('Api#ins_log');
-  $r->post('/api/ins_headers')->to('Api#ins_headers');
 
-}
-
-sub myconfig {
-  return($config);
 }
 
 1;

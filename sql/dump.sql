@@ -16,6 +16,27 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: urls_on_insert(); Type: FUNCTION; Schema: public; Owner: admin
+--
+
+CREATE FUNCTION public.urls_on_insert() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$BEGIN
+    PERFORM (
+        WITH url_row("id", "url") AS (
+            SELECT NEW.id, NEW.url
+        )
+        SELECT pg_notify('urls_inserts', row_to_json(url_row) :: TEXT)
+        FROM url_row
+    );
+    RETURN NULL;
+END
+    $$;
+
+
+ALTER FUNCTION public.urls_on_insert() OWNER TO admin;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -442,6 +463,13 @@ ALTER TABLE ONLY public.urls
 
 ALTER TABLE ONLY public.urls
     ADD CONSTRAINT urls_url_key UNIQUE (url);
+
+
+--
+-- Name: urls urls_trigger; Type: TRIGGER; Schema: public; Owner: admin
+--
+
+CREATE TRIGGER urls_trigger AFTER INSERT ON public.urls FOR EACH ROW EXECUTE FUNCTION public.urls_on_insert();
 
 
 --

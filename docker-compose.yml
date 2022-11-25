@@ -36,9 +36,9 @@ services:
     image: "madcore/mojolicious"
     restart: on-failure
     depends_on:
-      - web
+      - pg_db
     links:
-      - web
+      - pg_db
     command: [ "./script/poold" ]
     volumes:
       - type: bind

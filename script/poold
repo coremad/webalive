@@ -3,50 +3,23 @@ use strict;
 use warnings FATAL => 'all';
 
 use Mojo::UserAgent;
-use Mojo::File qw(curfile);
-use Mojo::JSON qw(encode_json);
+use Mojo::JSON qw(encode_json decode_json);
 use Mojo::Log;
-use YAML qw(LoadFile);
+use Mojo::File qw(curfile);
+use lib curfile->dirname->sibling('lib')->to_string;
+use WebAlive::Model::Webkeeper;
 use POSIX ":sys_wait_h";
 
 use v5.20;
 
-my $config;
-my $url_list;
+# use Data::Dumper;
+
 my %kids;
 my $log = Mojo::Log->new;
 my $term = 0;
-my $reload = 0;
+my $listener_pid;
 
-sub init {
-    $config = LoadFile(curfile->dirname->sibling('web_alive.yml')->to_string)
-        or die("config web_alive.yml not found");
-    $reload = 1;
-}
-
-sub check_url {
-    my ($row) = @_;
-    my $ua  = Mojo::UserAgent->new;
-    my $res;
-    my $api = $config->{api_endpoint};
-    eval { $res = $ua->get($row->{url})->result; };
-    my $post_res = $ua->post("$api/ins_log" => {Accept => '*/*'} => json =>
-        { id => $row->{id}, code => $res->{code}})->result;
-    $log->info($row->{url});
-    return unless ($post_res and $post_res->is_success
-        and $post_res->code == 200 and $post_res->text =~ /^\d+$/)
-        and ($res and exists $res->{code} and exists $res->headers->{headers});
-    my $headers = $res->headers->{headers};
-    my $header_count = $config->{max_headers};
-    foreach my $header_name (keys %{$headers}) {
-        $ua->post("$api/ins_headers" => {Accept => '*/*'} => json => {
-            log_id => $post_res->text,
-            header_name => $header_name,
-            headers => encode_json($headers->{$header_name})
-        });
-        --$header_count or last();
-    }
-}
+$SIG{$_}  = sub { $term = 1; $log->info(" Exiting..."); } for('INT', 'TERM', 'QUIT');
 
 $SIG{CHLD} = \&REAPER;
 sub REAPER {
@@ -55,46 +28,53 @@ sub REAPER {
     $SIG{CHLD} = \&REAPER;
 }
 
-$SIG{HUP} = \&init;
+sub check_url {
+    my $row = shift;
+    $row = decode_json($row) unless ref $row;
+    my $keeper = WebAlive::Model::Webkeeper->new;
+    my $ua  = Mojo::UserAgent->new;
+    my $res;
+    eval { $res = $ua->get($row->{url})->result; };
+    my $log_id = $keeper->ins_log($row->{id}, $res->{code});
+    return (0) unless $res and exists $res->{code} and exists $res->headers->{headers};
+    my $headers = $res->headers->{headers};
+    my $header_count = $keeper->config->{max_headers};
+    foreach my $header_name (keys %{$headers}) {
+        $keeper->ins_header($log_id, $header_name, encode_json($headers->{$header_name}));
+        --$header_count or last();
+    }
+    $log->info("Done $row->{url}");
+}
 
-$SIG{$_}  = sub { $term = 1; $log->info(" Exiting..." . scalar keys %kids);} for('INT', 'TERM', 'QUIT');
-
-$SIG{ALRM} = sub {$log->error("WTF?!"); sleep(1)};
-
-init();
+unless ($listener_pid = fork()) {
+    my $keeper = WebAlive::Model::Webkeeper->new;
+    $keeper->start_listen(\&check_url);
+    exit;
+}
 
 do {{
-    my $ua = Mojo::UserAgent->new;
-    my $next_time = $config->{pool_interval} + time();
+    my $keeper = WebAlive::Model::Webkeeper->new;
+    my $next_time = $keeper->config->{pool_interval} + time();
     $log->info(">\tStart checks");
-    my $res;
-    eval {
-        sleep(1) until ($res = $ua->get("$config->{api_endpoint}/url_list")->result
-            and $res->{code} == 200);
-    };
-    $reload = 0;
-    if ($res and $url_list = $res->json and (ref $url_list eq 'ARRAY')) {
-        foreach my $row (@$url_list) {
-            last if ($term || $reload);
-            if (my $pid = fork()) {
-                $kids{$pid} = time();
-            }
-            else {
-                check_url($row);
-                exit;
-            }
-            delete($kids{waitpid(-1, 0)}) while ($config->{max_workers} < scalar keys %kids);
+    my $url_list = $keeper->url_list;
+    foreach my $row (@$url_list) {
+        last if $term;
+        if (my $pid = fork()) {
+            $kids{$pid} = time();
         }
-    } else {
-        $log->error("Something wrong with backend");
-        sleep 3;
-        $reload = 1;
+        else {
+            check_url($row);
+            exit;
+        }
+        delete($kids{waitpid(-1, 0)}) while ($keeper->config->{max_workers} < scalar keys %kids);
     }
     $log->info(">\tDone, still running children:  " . scalar keys %kids);
-    sleep(1) until ($next_time <= time() or $term or $reload);
+    sleep(1) until ($next_time <= time() or $term);
 }} until ( $term );
+
+kill TERM => $listener_pid;
 
 my $kid;
 do {
     $kid = waitpid(-1, 0);
-} while ($kid > 0 and delete($kids{$kid}));
+} while ($kid > 0);
